@@ -4,6 +4,7 @@ local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.
 
 local playersService = game:GetService("Players")
 local runService = game:GetService("RunService")
+local lightingService = game:GetService("Lighting")
 local localPlayer = playersService.LocalPlayer
 
 local Window = Fluent:CreateWindow({
@@ -19,6 +20,7 @@ local Window = Fluent:CreateWindow({
 
 local Tabs = {
     Esp = Window:AddTab({ Title = "Tap Esp", Icon = "eye" }),
+    Visual = Window:AddTab({ Title = "Visual", Icon = "sun" }),
     Settings = Window:AddTab({ Title = "Settings", Icon = "settings" }),
 }
 
@@ -28,6 +30,46 @@ local highlightObjects = {}
 
 local SURVIVOR_COLOR = Color3.fromRGB(0, 255, 80)
 local KILLER_COLOR = Color3.fromRGB(255, 50, 50)
+
+local originalLighting = {
+    Brightness        = lightingService.Brightness,
+    Ambient           = lightingService.Ambient,
+    OutdoorAmbient    = lightingService.OutdoorAmbient,
+    FogEnd            = lightingService.FogEnd,
+    FogStart          = lightingService.FogStart,
+    ClockTime         = lightingService.ClockTime,
+    GlobalShadows     = lightingService.GlobalShadows,
+}
+
+local function applyFullbright()
+    lightingService.Brightness = 2
+    lightingService.Ambient = Color3.fromRGB(255, 255, 255)
+    lightingService.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+    lightingService.FogEnd = 100000
+    lightingService.FogStart = 100000
+    lightingService.ClockTime = 14
+    lightingService.GlobalShadows = false
+
+    for _, effect in pairs(lightingService:GetChildren()) do
+        pcall(function() effect:Destroy() end)
+    end
+end
+
+local function restoreLighting()
+    lightingService.Brightness     = originalLighting.Brightness
+    lightingService.Ambient        = originalLighting.Ambient
+    lightingService.OutdoorAmbient = originalLighting.OutdoorAmbient
+    lightingService.FogEnd         = originalLighting.FogEnd
+    lightingService.FogStart       = originalLighting.FogStart
+    lightingService.ClockTime      = originalLighting.ClockTime
+    lightingService.GlobalShadows  = originalLighting.GlobalShadows
+
+    for _, effect in pairs(lightingService:GetChildren()) do
+        if effect:IsA("ColorCorrectionEffect") or effect:IsA("BlurEffect") or effect:IsA("SunRaysEffect") then
+            effect.Enabled = true
+        end
+    end
+end
 
 local function getTeamColor(team)
     if team == "Survivor" then return SURVIVOR_COLOR end
@@ -171,10 +213,8 @@ local function updateEsp()
     if not camera then return end
 
     local espOn = Options.EspToggle and Options.EspToggle.Value
-
     local localCharacter = getPlayerCharacter(localPlayer) or localPlayer.Character
     local localRoot = localCharacter and localCharacter:FindFirstChild("HumanoidRootPart")
-
     local activePlayers = {}
 
     for _, player in pairs(playersService:GetPlayers()) do
@@ -292,6 +332,20 @@ Options.EspToggle:OnChanged(function()
             hideEsp(player)
             removeHighlight(player)
         end
+    end
+end)
+
+Tabs.Visual:AddToggle("FullbrightToggle", {
+    Title = "Full Bright",
+    Description = "",
+    Default = false,
+})
+
+Options.FullbrightToggle:OnChanged(function()
+    if Options.FullbrightToggle.Value then
+        applyFullbright()
+    else
+        restoreLighting()
     end
 end)
 
