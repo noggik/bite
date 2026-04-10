@@ -32,27 +32,30 @@ local SURVIVOR_COLOR = Color3.fromRGB(0, 255, 80)
 local KILLER_COLOR = Color3.fromRGB(255, 50, 50)
 
 local originalLighting = {
-    Brightness        = lightingService.Brightness,
-    Ambient           = lightingService.Ambient,
-    OutdoorAmbient    = lightingService.OutdoorAmbient,
-    FogEnd            = lightingService.FogEnd,
-    FogStart          = lightingService.FogStart,
-    ClockTime         = lightingService.ClockTime,
-    GlobalShadows     = lightingService.GlobalShadows,
+    Brightness     = lightingService.Brightness,
+    Ambient        = lightingService.Ambient,
+    OutdoorAmbient = lightingService.OutdoorAmbient,
+    FogEnd         = lightingService.FogEnd,
+    FogStart       = lightingService.FogStart,
+    ClockTime      = lightingService.ClockTime,
+    GlobalShadows  = lightingService.GlobalShadows,
 }
 
-local function applyFullbright()
-    lightingService.Brightness = 2
-    lightingService.Ambient = Color3.fromRGB(255, 255, 255)
-    lightingService.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
-    lightingService.FogEnd = 100000
-    lightingService.FogStart = 100000
-    lightingService.ClockTime = 14
-    lightingService.GlobalShadows = false
-
+local function clearLightingChildren()
     for _, effect in pairs(lightingService:GetChildren()) do
         pcall(function() effect:Destroy() end)
     end
+end
+
+local function applyFullbright()
+    lightingService.Brightness     = 2
+    lightingService.Ambient        = Color3.fromRGB(255, 255, 255)
+    lightingService.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+    lightingService.FogEnd         = 100000
+    lightingService.FogStart       = 100000
+    lightingService.ClockTime      = 14
+    lightingService.GlobalShadows  = false
+    clearLightingChildren()
 end
 
 local function restoreLighting()
@@ -63,13 +66,15 @@ local function restoreLighting()
     lightingService.FogStart       = originalLighting.FogStart
     lightingService.ClockTime      = originalLighting.ClockTime
     lightingService.GlobalShadows  = originalLighting.GlobalShadows
-
-    for _, effect in pairs(lightingService:GetChildren()) do
-        if effect:IsA("ColorCorrectionEffect") or effect:IsA("BlurEffect") or effect:IsA("SunRaysEffect") then
-            effect.Enabled = true
-        end
-    end
 end
+
+lightingService.ChildAdded:Connect(function(child)
+    if Options.FullbrightToggle and Options.FullbrightToggle.Value then
+        task.defer(function()
+            pcall(function() child:Destroy() end)
+        end)
+    end
+end)
 
 local function getTeamColor(team)
     if team == "Survivor" then return SURVIVOR_COLOR end
