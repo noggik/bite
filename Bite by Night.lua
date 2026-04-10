@@ -27,6 +27,10 @@ local Tabs = {
 local Options = Fluent.Options
 local espObjects = {}
 local highlightObjects = {}
+local generatorEspObjects = {}
+local generatorHighlightObjects = {}
+
+local GENERATOR_COLOR = Color3.fromRGB(255, 200, 0)
 
 local SURVIVOR_COLOR = Color3.fromRGB(0, 255, 80)
 local KILLER_COLOR = Color3.fromRGB(255, 50, 50)
@@ -354,6 +358,125 @@ Options.FullbrightToggle:OnChanged(function()
     end
 end)
 
+Tabs.Esp:AddToggle("GeneratorEspToggle", {
+    Title = "ESP Generators",
+    Description = "",
+    Default = false,
+})
+
+Options.GeneratorEspToggle:OnChanged(function()
+    if not Options.GeneratorEspToggle.Value then
+        for _, drawingObj in pairs(generatorEspObjects) do
+            pcall(function() drawingObj:Remove() end)
+        end
+        table.clear(generatorEspObjects)
+        for _, highlightObj in pairs(generatorHighlightObjects) do
+            pcall(function() highlightObj:Destroy() end)
+        end
+        table.clear(generatorHighlightObjects)
+    end
+end)
+
+local function addGeneratorHighlight(generator, generatorPart)
+    if generatorHighlightObjects[generator] then
+        pcall(function() generatorHighlightObjects[generator]:Destroy() end)
+        generatorHighlightObjects[generator] = nil
+    end
+    local highlight = Instance.new("Highlight")
+    highlight.FillColor = GENERATOR_COLOR
+    highlight.OutlineColor = GENERATOR_COLOR
+    highlight.FillTransparency = 0.55
+    highlight.OutlineTransparency = 0
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Adornee = generator
+    highlight.Parent = generator
+    generatorHighlightObjects[generator] = highlight
+end
+
+local function removeGeneratorHighlight(generator)
+    if generatorHighlightObjects[generator] then
+        pcall(function() generatorHighlightObjects[generator]:Destroy() end)
+        generatorHighlightObjects[generator] = nil
+    end
+end
+
+local function updateGeneratorEsp()
+    local espOn = Options.GeneratorEspToggle and Options.GeneratorEspToggle.Value
+
+    if not espOn then return end
+
+    local camera = workspace.CurrentCamera
+    if not camera then return end
+
+    local gameMap = workspace.MAPS:FindFirstChild("GAME MAP")
+    if not gameMap then return end
+
+    local generatorsFolder = gameMap:FindFirstChild("Generators")
+    if not generatorsFolder then return end
+
+    local localCharacter = getPlayerCharacter(localPlayer) or localPlayer.Character
+    if not localCharacter then return end
+
+    local localRoot = localCharacter:FindFirstChild("HumanoidRootPart")
+    if not localRoot then return end
+
+    local activeGenerators = {}
+
+    for _, generator in pairs(generatorsFolder:GetChildren()) do
+        local generatorRoot = generator:FindFirstChildWhichIsA("BasePart")
+        if generatorRoot then
+            activeGenerators[generator] = true
+
+            local currentHighlight = generatorHighlightObjects[generator]
+            if not currentHighlight or not currentHighlight.Parent then
+                addGeneratorHighlight(generator, generatorRoot)
+            end
+
+            local screenPosition, onScreen = camera:WorldToViewportPoint(generatorRoot.Position)
+
+            if not onScreen or screenPosition.Z <= 0 then
+                if generatorEspObjects[generator] then
+                    pcall(function() generatorEspObjects[generator]:Remove() end)
+                    generatorEspObjects[generator] = nil
+                end
+                continue
+            end
+
+            local distanceValue = math.floor((localRoot.Position - generatorRoot.Position).Magnitude)
+
+            if not generatorEspObjects[generator] then
+                generatorEspObjects[generator] = Drawing.new("Text")
+                local textObj = generatorEspObjects[generator]
+                textObj.Size = 13
+                textObj.Center = true
+                textObj.Outline = true
+                textObj.OutlineColor = Color3.fromRGB(0, 0, 0)
+                textObj.Color = GENERATOR_COLOR
+            end
+
+            local textObj = generatorEspObjects[generator]
+            textObj.Visible = true
+            textObj.Text = generator.Name .. " [" .. distanceValue .. "m]"
+            textObj.Position = Vector2.new(screenPosition.X, screenPosition.Y)
+        end
+    end
+
+    for generator, _ in pairs(generatorEspObjects) do
+        if not activeGenerators[generator] then
+            if generatorEspObjects[generator] then
+                pcall(function() generatorEspObjects[generator]:Remove() end)
+                generatorEspObjects[generator] = nil
+            end
+            removeGeneratorHighlight(generator)
+        end
+    end
+end
+
+runService.RenderStepped:Connect(function()
+    updateEsp()
+    updateGeneratorEsp()
+end)
+
 playersService.PlayerAdded:Connect(function(player)
     task.wait(2)
     if not espObjects[player] then
@@ -371,10 +494,7 @@ for _, player in pairs(playersService:GetPlayers()) do
     end
 end
 
-runService.RenderStepped:Connect(updateEsp)
-
 SaveManager:SetLibrary(Fluent)
-InterfaceManager:SetLibrary(Fluent)
 SaveManager:IgnoreThemeSettings()
 SaveManager:SetIgnoreIndexes({})
 InterfaceManager:SetFolder("BiteByNight")
